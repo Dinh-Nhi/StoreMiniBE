@@ -28,10 +28,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/user/**").permitAll()
                         .anyRequest().authenticated()
                 )
+                // Thêm filter JWT để xác thực token
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
+
 
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
