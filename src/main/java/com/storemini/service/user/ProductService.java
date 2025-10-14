@@ -20,6 +20,7 @@ public interface ProductService {
 
     void deleteProduct(Long id);
 
+    List<ProductEntity> getProductsByCategory(Long categoryId);
     // ===============================
     // CRUD VARIANT / SIZE
     // ===============================

@@ -15,9 +15,9 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
     // Tìm sản phẩm theo tên gần đúng (cho trang tìm kiếm)
     List<ProductEntity> findByNameContainingIgnoreCase(String keyword);
 
-//    // Lấy danh sách sản phẩm theo danh mục
-//    List<ProductEntity> findByCategory(CategoryEntity category);
-//
+    // Lấy danh sách sản phẩm theo danh mục
+    List<ProductEntity> findByCategoryIdAndIsShowTrueAndActiveTrue(Long categoryId);
+
 //    // Lấy danh sách sản phẩm theo thương hiệu
 //    List<ProductEntity> findByBrand(BrandEntity brand);
 

@@ -48,4 +48,9 @@ public class CategoryController {
         categoryRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/getByIsShow")
+    public ResponseEntity<List<CategoryEntity>> getByIsShow() {
+        return ResponseEntity.ok(categoryRepository.findIsShowCategories());
+    }
 }

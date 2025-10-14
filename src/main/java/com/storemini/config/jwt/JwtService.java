@@ -60,6 +60,7 @@ public class JwtService {
             claims.put("id", customUser.getUser().getId());
             claims.put("email", customUser.getUser().getEmail());
             claims.put("userName", customUser.getUser().getUsername());
+            claims.put("fullName", customUser.getUser().getFullName());
         }
 
         // Lấy danh sách quyền (roles)

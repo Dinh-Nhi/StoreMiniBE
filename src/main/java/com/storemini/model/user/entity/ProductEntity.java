@@ -28,6 +28,8 @@ public class ProductEntity {
     private BigDecimal basePrice;
 
     private Boolean active = true;
+    private Boolean isNew = true;
+    private Boolean isShow = true;
 
     @Column(name = "brand_id")
     private Long brandId;

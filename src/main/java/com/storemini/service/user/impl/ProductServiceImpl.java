@@ -85,6 +85,10 @@ public class ProductServiceImpl implements ProductService {
                 existing.setBasePrice(updatedProduct.getBasePrice());
             if (updatedProduct.getActive() != null)
                 existing.setActive(updatedProduct.getActive());
+            if (updatedProduct.getIsNew() != null)
+                existing.setIsNew(updatedProduct.getIsNew());
+            if (updatedProduct.getIsShow() != null)
+                existing.setIsShow(updatedProduct.getIsShow());
 
             // 🔹 Kiểm tra Category
             if (updatedProduct.getCategoryId() != null) {
@@ -159,4 +163,10 @@ public class ProductServiceImpl implements ProductService {
         size.setVariant(variant);
         return sizeRepository.save(size);
     }
+
+    @Override
+    public List<ProductEntity> getProductsByCategory(Long categoryId) {
+        return productRepository.findByCategoryIdAndIsShowTrueAndActiveTrue(categoryId);
+    }
+
 }
