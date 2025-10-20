@@ -61,14 +61,9 @@ public class JwtService {
             claims.put("email", customUser.getUser().getEmail());
             claims.put("userName", customUser.getUser().getUsername());
             claims.put("fullName", customUser.getUser().getFullName());
-        }
+            claims.put("roles", customUser.getUser().getRole());
 
-        // Lấy danh sách quyền (roles)
-        List<String> roles = new ArrayList<>();
-        for (GrantedAuthority authority : userDetails.getAuthorities()) {
-            roles.add(authority.getAuthority());
         }
-        claims.put("roles", roles);
 
         // Sinh token
         return Jwts.builder()

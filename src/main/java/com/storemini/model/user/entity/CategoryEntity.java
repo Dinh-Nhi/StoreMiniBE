@@ -19,4 +19,5 @@ public class CategoryEntity {
     private String name;
     private String description;
     private Boolean isShow;
+    private Integer status;
 }

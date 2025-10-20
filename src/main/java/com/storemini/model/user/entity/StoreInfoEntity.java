@@ -16,7 +16,7 @@ public class StoreInfoEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private Long id;
 
     private String code;
 
@@ -31,7 +31,7 @@ public class StoreInfoEntity {
 
     private Integer sort = 1;
 
-    private Integer status = 0;
+    private Integer status;
 
     @Column(length = 255)
     private String link;

@@ -25,6 +25,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // không dùng session
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/admin/**").authenticated() // chỉ cho user đăng nhập
                         .requestMatchers("/api/user/**").permitAll()
                         .anyRequest().authenticated()
                 )

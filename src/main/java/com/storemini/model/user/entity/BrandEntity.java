@@ -19,4 +19,6 @@ public class BrandEntity {
     private String name;
 
     private String country;
+    private Integer status;
+
 }
