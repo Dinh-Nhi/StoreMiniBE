@@ -1,5 +1,6 @@
 package com.storemini.controller.admin.inforWeb;
 
+import com.storemini.model.user.dto.StoreInfoDto;
 import com.storemini.model.user.entity.StoreInfoEntity;
 import com.storemini.model.user.repository.StoreInfoRepository;
 import lombok.RequiredArgsConstructor;
@@ -24,7 +25,7 @@ public class AdminStoreInfoController {
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getInfoById(@PathVariable Long id) {
-        Optional<StoreInfoEntity> info = storeInfoRepository.findById(id);
+        Optional<StoreInfoDto> info = storeInfoRepository.findByIdWithMedia(id);
         if (info.isPresent()) {
             return ResponseEntity.ok(info.get());
         } else {
