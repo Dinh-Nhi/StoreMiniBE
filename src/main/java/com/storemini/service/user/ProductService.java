@@ -25,6 +25,7 @@ public interface ProductService {
     // CRUD VARIANT / SIZE
     // ===============================
     ProductVariantEntity addVariant(Long productId, ProductVariantEntity variant);
-
     ProductSizeEntity addSize(Long variantId, ProductSizeEntity size);
+    List<ProductEntity> getBestSellingProducts(int limit);
+    List<ProductEntity> getDiscountedProducts(int limit);
 }

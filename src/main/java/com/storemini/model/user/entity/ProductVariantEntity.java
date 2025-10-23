@@ -21,25 +21,17 @@ public class ProductVariantEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     private String color;
-
     private String material;
-
     private BigDecimal price;
-
     private Integer stock;
-
+    private Integer Sold;
     private Boolean available = true;
-
 
     @ManyToOne
     @JoinColumn(name = "product_id")
     @JsonIgnore
     private ProductEntity product;
-
-    @Column(name = "file_key", length = 255)
-    private String fileKey;
 
     @OneToMany(mappedBy = "variant", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<ProductSizeEntity> sizes;

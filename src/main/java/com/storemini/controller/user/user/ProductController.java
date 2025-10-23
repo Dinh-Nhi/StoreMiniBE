@@ -57,4 +57,18 @@ public class ProductController {
 
         return ResponseEntity.ok(products);
     }
+
+    @GetMapping("/best-selling")
+    public ResponseEntity<List<ProductEntity>> getBestSellingProducts(
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        List<ProductEntity> products = productService.getBestSellingProducts(limit);
+        return ResponseEntity.ok(products);
+    }
+
+    @GetMapping("/discounted")
+    public List<ProductEntity> getDiscountedProducts(
+            @RequestParam(defaultValue = "10") int limit) {
+        return productService.getDiscountedProducts(limit);
+    }
 }

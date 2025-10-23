@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -85,6 +86,8 @@ public class ProductServiceImpl implements ProductService {
                 existing.setBasePrice(updatedProduct.getBasePrice());
             if (updatedProduct.getActive() != null)
                 existing.setActive(updatedProduct.getActive());
+            if (updatedProduct.getFileKey() != null)
+                existing.setFileKey(updatedProduct.getFileKey());
             if (updatedProduct.getIsNew() != null)
                 existing.setIsNew(updatedProduct.getIsNew());
             if (updatedProduct.getIsShow() != null)
@@ -165,8 +168,23 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    public List<ProductEntity> getBestSellingProducts(int limit) {
+        List<ProductEntity> all = productRepository.findBestSellingProducts();
+        return all.stream()
+                .limit(limit)
+                .toList();
+    }
+
+    @Override
     public List<ProductEntity> getProductsByCategory(Long categoryId) {
         return productRepository.findByCategoryIdAndIsShowTrueAndActiveTrue(categoryId);
     }
 
+    @Override
+    public List<ProductEntity> getDiscountedProducts(int limit) {
+        return productRepository.findAll().stream()
+                .filter(p -> p.getDiscount() != null && p.getDiscount().compareTo(java.math.BigDecimal.ZERO) > 0)
+                .limit(limit)
+                .collect(Collectors.toList());
+    }
 }

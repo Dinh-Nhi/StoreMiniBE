@@ -28,4 +28,13 @@ public interface ProductRepository extends JpaRepository<ProductEntity, Long> {
     // Truy vấn có join: lấy sản phẩm và load các variant
     @Query("SELECT DISTINCT p FROM ProductEntity p LEFT JOIN FETCH p.variants WHERE p.id = :id")
     ProductEntity findProductWithVariants(@Param("id") Long id);
+
+
+    @Query("""
+        SELECT p FROM ProductEntity p
+        JOIN p.variants v
+        GROUP BY p
+        ORDER BY SUM(v.Sold) DESC
+    """)
+    List<ProductEntity> findBestSellingProducts();
 }

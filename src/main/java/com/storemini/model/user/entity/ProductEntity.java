@@ -26,7 +26,10 @@ public class ProductEntity {
     @Column(columnDefinition = "TEXT")
     private String description;
     private BigDecimal basePrice;
+    private BigDecimal discount;
 
+    @Column(name = "file_key", length = 255)
+    private String fileKey;
     private Boolean active = true;
     private Boolean isNew = true;
     private Boolean isShow = true;
