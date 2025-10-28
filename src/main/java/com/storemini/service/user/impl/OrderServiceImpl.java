@@ -1,7 +1,8 @@
 package com.storemini.service.user.impl;
 
-import com.storemini.model.user.entity.*;
-import com.storemini.model.user.enums.OrderStatus;
+import com.storemini.model.user.entity.OrderEntity;
+import com.storemini.model.user.entity.OrderItemEntity;
+import com.storemini.model.user.entity.ProductVariantEntity;
 import com.storemini.model.user.repository.OrderRepository;
 import com.storemini.model.user.repository.ProductVariantRepository;
 import com.storemini.payload.request.OrderItemRequest;
@@ -31,7 +32,7 @@ public class OrderServiceImpl implements OrderService {
         order.setPhone(request.getPhone());
         order.setAddress(request.getAddress());
         order.setPaymentMethod(request.getPaymentMethod());
-        order.setStatus(OrderStatus.PENDING);
+        order.setStatus("PENDING");
 
         List<OrderItemEntity> items = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;

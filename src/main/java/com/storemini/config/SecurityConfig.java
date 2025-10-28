@@ -27,6 +27,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/admin/**").authenticated() // chỉ cho user đăng nhập
                         .requestMatchers("/api/user/**").permitAll()
+                        .requestMatchers("/api/media/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 // Thêm filter JWT để xác thực token

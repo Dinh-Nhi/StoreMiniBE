@@ -1,8 +1,6 @@
 package com.storemini.model.user.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
-import com.storemini.model.user.enums.OrderStatus;
 import com.storemini.model.user.enums.PaymentMethod;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -29,10 +27,9 @@ public class OrderEntity {
     private String address;
 
     @Enumerated(EnumType.STRING)
-    private PaymentMethod paymentMethod; // COD / BANK_TRANSFER
+    private PaymentMethod paymentMethod;
 
-    @Enumerated(EnumType.STRING)
-    private OrderStatus status = OrderStatus.PENDING;
+    private String status;
 
     private BigDecimal totalPrice;
 
