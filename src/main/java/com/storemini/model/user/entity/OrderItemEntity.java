@@ -21,6 +21,8 @@ public class OrderItemEntity {
     private String productName;
     private Integer quantity;
     private BigDecimal price;
+    private String color;
+    private String size;
 
     @ManyToOne
     @JoinColumn(name = "variant_id")
