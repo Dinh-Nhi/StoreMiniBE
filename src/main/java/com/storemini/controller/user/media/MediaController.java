@@ -285,4 +285,43 @@ public class MediaController {
         }
     }
 
+    @GetMapping("/viewAllFileKeyForProduct/{filekey}")
+    public ResponseEntity<?> viewAllFileKeyForProduct(@PathVariable String filekey) {
+        try {
+            List<MediaEntity> mediaList = mediaRepository.findAllByFileKey(filekey);
+
+            if (mediaList.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("message", "Không tìm thấy hình ảnh cho sản phẩm này"));
+            }
+
+            // 🔹 Trả về danh sách chứa tên file, đường dẫn và dữ liệu base64 (để React dễ dùng)
+            List<Map<String, Object>> result = new ArrayList<>();
+
+            for (MediaEntity media : mediaList) {
+                Path path = Paths.get(media.getPath());
+                if (!Files.exists(path)) continue;
+
+                String contentType = Files.probeContentType(path);
+                byte[] bytes = Files.readAllBytes(path);
+                String base64 = Base64.getEncoder().encodeToString(bytes);
+
+                result.add(Map.of(
+                        "name", media.getName(),
+                        "main", media.getMain(),
+                        "fileKey", media.getFileKey(),
+                        "contentType", contentType,
+                        "data", "data:" + contentType + ";base64," + base64
+                ));
+            }
+
+            return ResponseEntity.ok(result);
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Lỗi khi đọc file"));
+        }
+    }
+
 }
