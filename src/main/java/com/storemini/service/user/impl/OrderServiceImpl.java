@@ -7,6 +7,7 @@ import com.storemini.model.user.repository.OrderRepository;
 import com.storemini.model.user.repository.ProductVariantRepository;
 import com.storemini.payload.request.OrderItemRequest;
 import com.storemini.payload.request.OrderRequest;
+import com.storemini.payload.request.OrderStatusRequest;
 import com.storemini.service.user.OrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -76,4 +77,25 @@ public class OrderServiceImpl implements OrderService {
     public Optional<OrderEntity> getOrderById(Long id) {
         return orderRepository.findById(id);
     }
+
+    @Override
+    @Transactional
+    public OrderEntity updateOrderStatus(OrderStatusRequest request) {
+        OrderEntity order = orderRepository.findById(request.getOrderId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
+        //Cập nhật sold cho các sản phẩm
+        List<ProductVariantEntity> entityList = new ArrayList<>();
+        order.getItems().forEach(item -> {
+            ProductVariantEntity variant = item.getVariant();
+            // Cập nhật số lượng đã bán
+            int newSold = (variant.getSold() == null ? 0 : variant.getSold()) + item.getQuantity();
+            variant.setSold(newSold);
+            entityList.add(variant);
+        });
+        variantRepository.saveAll(entityList);
+        //Cập nhật trạng thái đơn hàng
+        order.setStatus("PAYMENT");
+        return orderRepository.save(order);
+    }
+
 }
