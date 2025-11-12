@@ -8,4 +8,5 @@ import java.util.Optional;
 
 public interface MediaRepository extends JpaRepository<MediaEntity, Long> {
     Optional<MediaEntity> findByFileKey(String fileKey);
+    Optional<MediaEntity> findByFileKeyAndMainTrue(String fileKey);
 }

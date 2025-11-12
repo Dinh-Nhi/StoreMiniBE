@@ -2,6 +2,7 @@ package com.storemini.service.user.impl;
 
 import com.storemini.model.user.entity.OrderEntity;
 import com.storemini.model.user.entity.OrderItemEntity;
+import com.storemini.model.user.entity.ProductSizeEntity;
 import com.storemini.model.user.entity.ProductVariantEntity;
 import com.storemini.model.user.repository.OrderRepository;
 import com.storemini.model.user.repository.ProductVariantRepository;
@@ -27,6 +28,7 @@ public class OrderServiceImpl implements OrderService {
     private final ProductVariantRepository variantRepository;
 
     @Override
+    @Transactional
     public OrderEntity createOrder(OrderRequest request) {
         OrderEntity order = new OrderEntity();
         order.setCustomerName(request.getName());
@@ -39,33 +41,68 @@ public class OrderServiceImpl implements OrderService {
         BigDecimal total = BigDecimal.ZERO;
 
         for (OrderItemRequest itemReq : request.getItems()) {
+            // 🔹 Lấy variant theo ID
             ProductVariantEntity variant = variantRepository.findById(itemReq.getVariantId())
                     .orElseThrow(() -> new RuntimeException("Variant not found: " + itemReq.getVariantId()));
 
-            // Tạo chi tiết đơn hàng
+            // 🔹 Kiểm tra đúng màu (mỗi variant ứng với 1 màu)
+            if (!variant.getColor().equalsIgnoreCase(itemReq.getColor())) {
+                throw new RuntimeException(
+                        "Color mismatch for variant ID " + variant.getId() +
+                                ": expected " + variant.getColor() + ", got " + itemReq.getColor()
+                );
+            }
+
+            // 🔹 Lấy đúng size theo tên (vì size là String, ví dụ: "M", "L", "XL")
+            ProductSizeEntity sizeEntity = variant.getSizes().stream()
+                    .filter(s -> s.getSize().equalsIgnoreCase(itemReq.getSize()))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException(
+                            "Size '" + itemReq.getSize() + "' not found for variant " + variant.getId()
+                    ));
+
+            // 🔹 Trừ tồn kho size
+            int newSizeStock = sizeEntity.getStock() - itemReq.getQuantity();
+            if (newSizeStock < 0)
+                throw new RuntimeException("Hết hàng cho size " + sizeEntity.getSize() + " (" + variant.getColor() + ")");
+            sizeEntity.setStock(newSizeStock);
+
+            // 🔹 Trừ tồn kho tổng của variant (theo màu)
+            int newVariantStock = variant.getStock() - itemReq.getQuantity();
+            if (newVariantStock < 0)
+                throw new RuntimeException("Hết hàng cho màu " + variant.getColor());
+            variant.setStock(newVariantStock);
+
+            // 🔹 Cập nhật sold
+            variant.setSold(variant.getSold() + itemReq.getQuantity());
+
+            // 🔹 Tạo chi tiết đơn hàng
             OrderItemEntity item = new OrderItemEntity();
             item.setOrder(order);
             item.setVariant(variant);
             item.setProductName(variant.getProduct().getName());
+            item.setColor(variant.getColor());
+            item.setSize(sizeEntity.getSize()); // ✅ size là String
             item.setQuantity(itemReq.getQuantity());
             item.setPrice(variant.getPrice());
-
             items.add(item);
 
-            // Tính tổng
+            // 🔹 Cộng tổng tiền
             BigDecimal lineTotal = variant.getPrice().multiply(BigDecimal.valueOf(itemReq.getQuantity()));
             total = total.add(lineTotal);
-
-            // Giảm tồn kho
-            int newStock = variant.getStock() - itemReq.getQuantity();
-            if (newStock < 0) throw new RuntimeException("Hết hàng cho variant ID " + variant.getId());
-            variant.setStock(newStock);
         }
 
+        // 🔹 Gán danh sách item + tổng giá
         order.setItems(items);
         order.setTotalPrice(total);
 
-        return orderRepository.save(order);
+        // 🔹 Lưu order và cập nhật variant/size
+        OrderEntity savedOrder = orderRepository.save(order);
+        variantRepository.saveAll(
+                items.stream().map(OrderItemEntity::getVariant).distinct().toList()
+        );
+
+        return savedOrder;
     }
 
     @Override

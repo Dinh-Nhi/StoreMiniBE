@@ -131,6 +131,8 @@ public class MediaController {
 
             List<Map<String, Object>> uploadedFiles = new ArrayList<>();
 
+            boolean isFirst = true; // cờ để đánh dấu file đầu tiên
+
             for (MultipartFile file : files) {
                 if (file.isEmpty()) continue;
 
@@ -153,7 +155,7 @@ public class MediaController {
                 media.setDescription(description);
                 media.setPath(target.toAbsolutePath().toString());
                 media.setRoot(uploadPath.toAbsolutePath().toString());
-                media.setMain(false);
+                media.setMain(isFirst); // ảnh đầu tiên main = true
                 media.setUserAction(userAction);
                 media.setActionDate(LocalDateTime.now());
 
@@ -164,6 +166,8 @@ public class MediaController {
                 info.put("fileName", originalFilename);
                 info.put("url", "/api/media/view/" + saved.getId());
                 uploadedFiles.add(info);
+
+                isFirst = false; // từ ảnh thứ 2 trở đi main = false
             }
 
             Map<String, Object> response = new HashMap<>();
@@ -221,6 +225,38 @@ public class MediaController {
     public ResponseEntity<?> viewFileKey(@PathVariable String filekey) {
         try {
             Optional<MediaEntity> opt = mediaRepository.findByFileKey(filekey);
+            if (opt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("message", "Không tìm thấy media"));
+            }
+            MediaEntity media = opt.get();
+            Path path = Paths.get(media.getPath());
+            if (!Files.exists(path)) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("message", "File không tồn tại"));
+            }
+
+            String contentType = Files.probeContentType(path);
+            byte[] bytes = Files.readAllBytes(path);
+
+            MediaType mediaType = contentType != null ? MediaType.parseMediaType(contentType) : MediaType.APPLICATION_OCTET_STREAM;
+
+            return ResponseEntity.ok()
+                    .contentType(mediaType)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + (media.getName() == null ? path.getFileName() : media.getName()) + "\"")
+                    .body(bytes);
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Lỗi khi đọc file"));
+        }
+    }
+
+    @GetMapping("/viewFileKeyForProduct/{filekey}")
+    public ResponseEntity<?> viewFileKeyForProduct(@PathVariable String filekey) {
+        try {
+            Optional<MediaEntity> opt = mediaRepository.findByFileKeyAndMainTrue(filekey);
             if (opt.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(Map.of("message", "Không tìm thấy media"));
