@@ -8,6 +8,7 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.transaction.Transactional;
 import java.nio.file.*;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -19,22 +20,12 @@ public class MediaController {
 
     private final MediaRepository mediaRepository;
 
-    // Thư mục lưu file (có thể cấu hình trong application.yml)
     @Value("${app.upload.dir}")
     private String uploadDir;
 
-
-    /**
-     * Upload ảnh:
-     * - Nếu fileKey = "create" (hoặc rỗng) => sinh fileKey mới, tạo record mới, trả về fileKey + id
-     * - Nếu fileKey có giá trị => tạo record mới (không ghi đè) với cùng fileKey (mỗi ảnh có id khác)
-     *
-     * FE dùng:
-     * 1) POST /api/media/upload/create  (form-data: file, description, userAction)
-     *    -> server trả về fileKey (chuỗi)
-     * 2) POST /api/media/upload/{fileKey} (form-data: file, description, userAction)
-     *    -> server tạo thêm record mới với cùng fileKey
-     */
+    // ============================================================
+    // UPLOAD 1 FILE
+    // ============================================================
     @PostMapping({"/upload", "/upload/{fileKey}"})
     public ResponseEntity<?> uploadFile(
             @PathVariable(required = false) String fileKey,
@@ -47,80 +38,10 @@ public class MediaController {
                 return ResponseEntity.badRequest().body(Map.of("message", "File rỗng"));
             }
 
-            // đảm bảo folder tồn tại
             Path uploadPath = Paths.get(uploadDir);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
+            if (!Files.exists(uploadPath)) Files.createDirectories(uploadPath);
 
-            // Nếu fileKey là "create" hoặc null => sinh fileKey mới
-            boolean isCreateSignal = fileKey == null || fileKey.isBlank() || fileKey.equalsIgnoreCase("create") || fileKey.equalsIgnoreCase("new");
-            if (isCreateSignal) {
-                fileKey = UUID.randomUUID().toString();
-            }
-
-            // Sinh tên file lưu thực tế để tránh trùng (uuid + extension)
-            String originalFilename = file.getOriginalFilename();
-            String extension = "";
-            if (originalFilename != null && originalFilename.contains(".")) {
-                extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-            }
-            String physicalFileName = UUID.randomUUID().toString() + extension;
-            Path target = uploadPath.resolve(physicalFileName);
-
-            // Lưu file lên disk (ghi đè nếu trùng physicalFileName, nhưng UUID nên không trùng)
-            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
-
-            // Tạo bản ghi MediaEntity mới (luôn tạo mới record, không cập nhật record cũ)
-            MediaEntity media = new MediaEntity();
-            media.setFileKey(fileKey);
-            media.setName(originalFilename);
-            media.setDescription(description);
-            media.setPath(target.toAbsolutePath().toString());
-            media.setRoot(uploadPath.toAbsolutePath().toString());
-            media.setMain(true);
-            media.setUserAction(userAction == null ? "system" : userAction);
-            media.setActionDate(LocalDateTime.now());
-
-            MediaEntity saved = mediaRepository.save(media);
-
-            // Trả về thông tin: fileKey (dùng cho lần upload tiếp theo), id (của file vừa tạo)
-            Map<String, Object> body = new HashMap<>();
-            body.put("message", isCreateSignal ? "Upload mới thành công" : "Upload (thêm) thành công");
-            body.put("fileKey", fileKey);
-            body.put("id", saved.getId());
-            body.put("fileName", originalFilename);
-            body.put("url", "/api/media/view/" + saved.getId());
-
-            return ResponseEntity.ok(body);
-
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Upload thất bại"));
-        }
-    }
-
-
-    @PostMapping({"/uploadList", "/uploadList/{fileKey}"})
-    public ResponseEntity<?> uploadListFile(
-            @PathVariable(required = false) String fileKey,
-            @RequestParam("files") List<MultipartFile> files,
-            @RequestParam(value = "description", required = false) String description,
-            @RequestParam(value = "userAction", required = false, defaultValue = "system") String userAction
-    ) {
-        try {
-            if (files == null || files.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("message", "Không có file nào được gửi lên"));
-            }
-
-            // đảm bảo thư mục upload tồn tại
-            Path uploadPath = Paths.get(uploadDir);
-            if (!Files.exists(uploadPath)) {
-                Files.createDirectories(uploadPath);
-            }
-
-            // nếu fileKey = "create" hoặc rỗng -> sinh mới
+            // Nếu create → sinh fileKey mới
             boolean isCreateSignal = fileKey == null || fileKey.isBlank()
                     || fileKey.equalsIgnoreCase("create")
                     || fileKey.equalsIgnoreCase("new");
@@ -129,187 +50,176 @@ public class MediaController {
                 fileKey = UUID.randomUUID().toString();
             }
 
-            List<Map<String, Object>> uploadedFiles = new ArrayList<>();
+            String originalName = file.getOriginalFilename();
+            String ext = originalName != null && originalName.contains(".")
+                    ? originalName.substring(originalName.lastIndexOf("."))
+                    : "";
 
-            boolean isFirst = true; // cờ để đánh dấu file đầu tiên
+            String physicalName = UUID.randomUUID().toString() + ext;
+
+            Path target = uploadPath.resolve(physicalName);
+            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+
+            MediaEntity media = new MediaEntity();
+            media.setFileKey(fileKey);
+            media.setName(originalName);
+            media.setDescription(description);
+            media.setPath(target.toString());
+            media.setRoot(uploadPath.toString());
+
+            // nếu chưa có ảnh nào trong fileKey → ảnh đầu tiên là main
+            boolean noImageBefore = mediaRepository.countByFileKey(fileKey) == 0;
+            media.setMain(noImageBefore);
+
+            media.setUserAction(userAction);
+            media.setActionDate(LocalDateTime.now());
+
+            MediaEntity saved = mediaRepository.save(media);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", isCreateSignal ? "Upload mới thành công" : "Upload thêm thành công",
+                    "id", saved.getId(),
+                    "fileKey", fileKey,
+                    "fileName", originalName
+            ));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("message", "Upload thất bại"));
+        }
+    }
+
+    // ============================================================
+    // UPLOAD LIST FILE
+    // ============================================================
+    @PostMapping({"/uploadList", "/uploadList/{fileKey}"})
+    public ResponseEntity<?> uploadList(
+            @PathVariable(required = false) String fileKey,
+            @RequestParam("files") List<MultipartFile> files,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "userAction", required = false, defaultValue = "system") String userAction
+    ) {
+        try {
+            if (files == null || files.isEmpty())
+                return ResponseEntity.badRequest().body(Map.of("message", "Không có file nào"));
+
+            Path uploadPath = Paths.get(uploadDir);
+            if (!Files.exists(uploadPath)) Files.createDirectories(uploadPath);
+
+            boolean isCreateSignal = fileKey == null || fileKey.isBlank()
+                    || fileKey.equalsIgnoreCase("create")
+                    || fileKey.equalsIgnoreCase("new");
+
+            if (isCreateSignal) fileKey = UUID.randomUUID().toString();
+
+            boolean hasMainBefore = mediaRepository.findByFileKeyAndMainTrue(fileKey).isPresent();
+            boolean isFirstUpload = !hasMainBefore;
+
+            List<Map<String, Object>> list = new ArrayList<>();
 
             for (MultipartFile file : files) {
                 if (file.isEmpty()) continue;
 
-                String originalFilename = file.getOriginalFilename();
-                String extension = "";
-                if (originalFilename != null && originalFilename.contains(".")) {
-                    extension = originalFilename.substring(originalFilename.lastIndexOf("."));
-                }
+                String originalName = file.getOriginalFilename();
+                String ext = originalName != null && originalName.contains(".")
+                        ? originalName.substring(originalName.lastIndexOf("."))
+                        : "";
 
-                String physicalFileName = UUID.randomUUID().toString() + extension;
-                Path target = uploadPath.resolve(physicalFileName);
+                String physicalName = UUID.randomUUID().toString() + ext;
 
-                // lưu file vào disk
+                Path target = uploadPath.resolve(physicalName);
                 Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
 
-                // tạo record cho từng file
                 MediaEntity media = new MediaEntity();
                 media.setFileKey(fileKey);
-                media.setName(originalFilename);
+                media.setName(originalName);
                 media.setDescription(description);
-                media.setPath(target.toAbsolutePath().toString());
-                media.setRoot(uploadPath.toAbsolutePath().toString());
-                media.setMain(isFirst); // ảnh đầu tiên main = true
+                media.setPath(target.toString());
+                media.setRoot(uploadPath.toString());
+
+                media.setMain(isFirstUpload);
+                isFirstUpload = false;
+
                 media.setUserAction(userAction);
                 media.setActionDate(LocalDateTime.now());
 
                 MediaEntity saved = mediaRepository.save(media);
 
-                Map<String, Object> info = new HashMap<>();
-                info.put("id", saved.getId());
-                info.put("fileName", originalFilename);
-                info.put("url", "/api/media/view/" + saved.getId());
-                uploadedFiles.add(info);
-
-                isFirst = false; // từ ảnh thứ 2 trở đi main = false
+                list.add(Map.of(
+                        "id", saved.getId(),
+                        "fileName", originalName,
+                        "url", "/api/media/view/" + saved.getId()
+                ));
             }
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", isCreateSignal ? "Upload mới thành công" : "Upload thêm thành công");
-            response.put("fileKey", fileKey);
-            response.put("count", uploadedFiles.size());
-            response.put("files", uploadedFiles);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Upload thành công",
+                    "fileKey", fileKey,
+                    "files", list
+            ));
 
-            return ResponseEntity.ok(response);
-
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Upload thất bại"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("message", "Upload thất bại"));
         }
     }
 
-
-    /**
-     * Lấy file theo ID (trả raw bytes, FE có thể dùng <img src="/api/media/view/{id}">)
-     */
+    // ============================================================
+    // VIEW BY ID
+    // ============================================================
     @GetMapping("/view/{id}")
-    public ResponseEntity<?> viewById(@PathVariable Long id) {
+    public ResponseEntity<?> view(@PathVariable Long id) {
         try {
             Optional<MediaEntity> opt = mediaRepository.findById(id);
-            if (opt.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("message", "Không tìm thấy media"));
-            }
+            if (opt.isEmpty()) return ResponseEntity.status(404).body(Map.of("message", "Không tìm thấy ảnh"));
+
             MediaEntity media = opt.get();
             Path path = Paths.get(media.getPath());
-            if (!Files.exists(path)) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("message", "File không tồn tại"));
-            }
+
+            if (!Files.exists(path)) return ResponseEntity.status(404).body(Map.of("message", "File không tồn tại"));
 
             String contentType = Files.probeContentType(path);
             byte[] bytes = Files.readAllBytes(path);
 
-            MediaType mediaType = contentType != null ? MediaType.parseMediaType(contentType) : MediaType.APPLICATION_OCTET_STREAM;
-
             return ResponseEntity.ok()
-                    .contentType(mediaType)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + (media.getName() == null ? path.getFileName() : media.getName()) + "\"")
+                    .contentType(contentType != null ? MediaType.parseMediaType(contentType) : MediaType.APPLICATION_OCTET_STREAM)
                     .body(bytes);
 
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Lỗi khi đọc file"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("message", "Lỗi đọc file"));
         }
     }
 
-    @GetMapping("/viewFileKey/{filekey}")
-    public ResponseEntity<?> viewFileKey(@PathVariable String filekey) {
+    // ============================================================
+    // TRẢ VỀ LIST ẢNH BASE64 CHO FE
+    // ============================================================
+    @GetMapping("/viewAllFileKeyForProduct/{fileKey}")
+    public ResponseEntity<?> viewAllFileKeyForProduct(@PathVariable String fileKey) {
         try {
-            Optional<MediaEntity> opt = mediaRepository.findByFileKey(filekey);
-            if (opt.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("message", "Không tìm thấy media"));
-            }
-            MediaEntity media = opt.get();
-            Path path = Paths.get(media.getPath());
-            if (!Files.exists(path)) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("message", "File không tồn tại"));
-            }
+            List<MediaEntity> mediaList = mediaRepository.findAllByFileKey(fileKey);
 
-            String contentType = Files.probeContentType(path);
-            byte[] bytes = Files.readAllBytes(path);
+            if (mediaList.isEmpty())
+                return ResponseEntity.status(404).body(Map.of("message", "Không có ảnh"));
 
-            MediaType mediaType = contentType != null ? MediaType.parseMediaType(contentType) : MediaType.APPLICATION_OCTET_STREAM;
+            // Ảnh main sẽ được đưa lên đầu
+            mediaList.sort((a, b) -> Boolean.compare(b.getMain(), a.getMain()));
 
-            return ResponseEntity.ok()
-                    .contentType(mediaType)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + (media.getName() == null ? path.getFileName() : media.getName()) + "\"")
-                    .body(bytes);
-
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Lỗi khi đọc file"));
-        }
-    }
-
-    @GetMapping("/viewFileKeyForProduct/{filekey}")
-    public ResponseEntity<?> viewFileKeyForProduct(@PathVariable String filekey) {
-        try {
-            Optional<MediaEntity> opt = mediaRepository.findByFileKeyAndMainTrue(filekey);
-            if (opt.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("message", "Không tìm thấy media"));
-            }
-            MediaEntity media = opt.get();
-            Path path = Paths.get(media.getPath());
-            if (!Files.exists(path)) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("message", "File không tồn tại"));
-            }
-
-            String contentType = Files.probeContentType(path);
-            byte[] bytes = Files.readAllBytes(path);
-
-            MediaType mediaType = contentType != null ? MediaType.parseMediaType(contentType) : MediaType.APPLICATION_OCTET_STREAM;
-
-            return ResponseEntity.ok()
-                    .contentType(mediaType)
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + (media.getName() == null ? path.getFileName() : media.getName()) + "\"")
-                    .body(bytes);
-
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Lỗi khi đọc file"));
-        }
-    }
-
-    @GetMapping("/viewAllFileKeyForProduct/{filekey}")
-    public ResponseEntity<?> viewAllFileKeyForProduct(@PathVariable String filekey) {
-        try {
-            List<MediaEntity> mediaList = mediaRepository.findAllByFileKey(filekey);
-
-            if (mediaList.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Map.of("message", "Không tìm thấy hình ảnh cho sản phẩm này"));
-            }
-
-            // 🔹 Trả về danh sách chứa tên file, đường dẫn và dữ liệu base64 (để React dễ dùng)
             List<Map<String, Object>> result = new ArrayList<>();
 
-            for (MediaEntity media : mediaList) {
-                Path path = Paths.get(media.getPath());
+            for (MediaEntity m : mediaList) {
+                Path path = Paths.get(m.getPath());
                 if (!Files.exists(path)) continue;
 
-                String contentType = Files.probeContentType(path);
                 byte[] bytes = Files.readAllBytes(path);
                 String base64 = Base64.getEncoder().encodeToString(bytes);
+                String contentType = Files.probeContentType(path);
 
                 result.add(Map.of(
-                        "name", media.getName(),
-                        "main", media.getMain(),
-                        "fileKey", media.getFileKey(),
+                        "id", m.getId(),
+                        "name", m.getName(),
+                        "main", m.getMain(),
+                        "fileKey", m.getFileKey(),
                         "contentType", contentType,
                         "data", "data:" + contentType + ";base64," + base64
                 ));
@@ -317,10 +227,75 @@ public class MediaController {
 
             return ResponseEntity.ok(result);
 
-        } catch (Exception ex) {
-            ex.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Lỗi khi đọc file"));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("message", "Lỗi đọc file"));
+        }
+    }
+
+    // ============================================================
+    // DELETE MEDIA
+    // ============================================================
+    @DeleteMapping("/delete/{id}")
+    @Transactional
+    public ResponseEntity<?> delete(@PathVariable Long id) {
+        try {
+            Optional<MediaEntity> opt = mediaRepository.findById(id);
+            if (opt.isEmpty()) return ResponseEntity.status(404).body(Map.of("message", "Không tìm thấy ảnh"));
+
+            MediaEntity media = opt.get();
+            String fileKey = media.getFileKey();
+            boolean wasMain = media.getMain();
+
+            // Xóa file vật lý
+            try {
+                Path p = Paths.get(media.getPath());
+                if (Files.exists(p)) Files.delete(p);
+            } catch (Exception ignore) {}
+
+            mediaRepository.delete(media);
+
+            // Nếu xoá ảnh chính, chọn ảnh mới làm main
+            if (wasMain) {
+                List<MediaEntity> remain = mediaRepository.findAllByFileKey(fileKey);
+                if (!remain.isEmpty()) {
+                    MediaEntity first = remain.get(0);
+                    first.setMain(true);
+                    mediaRepository.save(first);
+                }
+            }
+
+            return ResponseEntity.ok(Map.of("message", "Xóa thành công"));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("message", "Lỗi xoá ảnh"));
+        }
+    }
+
+    // ============================================================
+    // SET MAIN
+    // ============================================================
+    @PutMapping("/set-main/{id}")
+    @Transactional
+    public ResponseEntity<?> setMain(@PathVariable Long id) {
+        try {
+            Optional<MediaEntity> opt = mediaRepository.findById(id);
+            if (opt.isEmpty()) return ResponseEntity.status(404).body(Map.of("message", "Không tìm thấy ảnh"));
+
+            MediaEntity target = opt.get();
+            String fileKey = target.getFileKey();
+
+            mediaRepository.updateMainFalseForFileKey(fileKey);
+
+            target.setMain(true);
+            mediaRepository.save(target);
+
+            return ResponseEntity.ok(Map.of("message", "Đặt ảnh chính thành công"));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("message", "Lỗi khi cập nhật ảnh chính"));
         }
     }
 
