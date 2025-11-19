@@ -48,22 +48,21 @@ public class OrderController {
     public ResponseEntity<?> createOrderVnpay(@RequestBody OrderRequest request) {
         // Tạo đơn hàng ở trạng thái "PENDING"
         OrderEntity order = orderService.createOrder(request);
-
         // Tạo link thanh toán VNPAY
         String paymentUrl = vnpayService.createPaymentUrl(order.getId(), order.getTotalPrice().longValue());
-
         // Trả về URL cho frontend redirect
         return ResponseEntity.ok(Map.of("paymentUrl", paymentUrl));
     }
 
     @PostMapping("/updateStatus")
     public ResponseEntity<?> updatePaymentStatus(@RequestBody OrderStatusRequest request) {
-        OrderEntity order = orderRepository.findById(request.getOrderId())
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn hàng"));
-        order.setStatus("PAYMENT");
-        orderRepository.save(order);
-        return ResponseEntity.ok(Map.of("message", "Thanh toán thành công"));
+        OrderEntity updatedOrder = orderService.updateOrderStatus(request);
+        return ResponseEntity.ok(Map.of(
+                "message", "Cập nhật trạng thái đơn hàng thành công",
+                "status", updatedOrder.getStatus()
+        ));
     }
+
 
 
 }
