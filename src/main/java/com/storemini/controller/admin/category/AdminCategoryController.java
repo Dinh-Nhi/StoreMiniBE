@@ -31,7 +31,7 @@ public class AdminCategoryController {
         }
     }
 
-    @PostMapping("/process")
+    @PostMapping("/save")
     public ResponseEntity<CategoryEntity> saveOrUpdateCategory(@RequestBody CategoryEntity categoryEntity) {
         if (categoryEntity.getId() != null) {
             Optional<CategoryEntity> existing = categoryRepository.findById(categoryEntity.getId());
