@@ -41,6 +41,7 @@ public class AuthService {
         newUser.setPhone(request.getPhone());
         newUser.setAddress(request.getAddress());
         newUser.setRole("USER");
+        newUser.setStatus(1);
 
         userRepository.save(newUser);
         return new AppResponse(2000, "Đăng ký thành công", newUser);
