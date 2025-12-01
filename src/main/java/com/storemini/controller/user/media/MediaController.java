@@ -299,4 +299,66 @@ public class MediaController {
         }
     }
 
+    @GetMapping("/viewFileKey/{filekey}")
+    public ResponseEntity<?> viewFileKey(@PathVariable String filekey) {
+        try {
+            Optional<MediaEntity> opt = mediaRepository.findByFileKey(filekey);
+            if (opt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("message", "Không tìm thấy media"));
+            }
+            MediaEntity media = opt.get();
+            Path path = Paths.get(media.getPath());
+            if (!Files.exists(path)) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("message", "File không tồn tại"));
+            }
+
+            String contentType = Files.probeContentType(path);
+            byte[] bytes = Files.readAllBytes(path);
+
+            MediaType mediaType = contentType != null ? MediaType.parseMediaType(contentType) : MediaType.APPLICATION_OCTET_STREAM;
+
+            return ResponseEntity.ok()
+                    .contentType(mediaType)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + (media.getName() == null ? path.getFileName() : media.getName()) + "\"")
+                    .body(bytes);
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Lỗi khi đọc file"));
+        }
+    }
+    @GetMapping("/viewFileKeyForProduct/{filekey}")
+    public ResponseEntity<?> viewFileKeyForProduct(@PathVariable String filekey) {
+        try {
+            Optional<MediaEntity> opt = mediaRepository.findByFileKeyAndMainTrue(filekey);
+            if (opt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("message", "Không tìm thấy media"));
+            }
+            MediaEntity media = opt.get();
+            Path path = Paths.get(media.getPath());
+            if (!Files.exists(path)) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("message", "File không tồn tại"));
+            }
+
+            String contentType = Files.probeContentType(path);
+            byte[] bytes = Files.readAllBytes(path);
+
+            MediaType mediaType = contentType != null ? MediaType.parseMediaType(contentType) : MediaType.APPLICATION_OCTET_STREAM;
+
+            return ResponseEntity.ok()
+                    .contentType(mediaType)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + (media.getName() == null ? path.getFileName() : media.getName()) + "\"")
+                    .body(bytes);
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Lỗi khi đọc file"));
+        }
+    }
 }
