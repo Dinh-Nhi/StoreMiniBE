@@ -10,8 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.net.URL;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -32,8 +30,8 @@ public class OrderController {
     }
 
     @GetMapping
-    public ResponseEntity<List<OrderEntity>> getOrdersByPhone(@RequestParam String phone) {
-        List<OrderEntity> orders = orderService.getOrdersByPhone(phone);
+    public ResponseEntity<List<OrderEntity>> getOrdersByName(@RequestParam String name) {
+        List<OrderEntity> orders = orderService.getOrdersByName(name);
         return ResponseEntity.ok(orders);
     }
 

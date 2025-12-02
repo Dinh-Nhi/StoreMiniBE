@@ -106,8 +106,8 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public List<OrderEntity> getOrdersByPhone(String phone) {
-        return orderRepository.findByPhone(phone);
+    public List<OrderEntity> getOrdersByName(String name) {
+        return orderRepository.findByCustomerName(name);
     }
 
     @Override
